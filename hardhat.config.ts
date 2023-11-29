@@ -102,7 +102,7 @@ const config: HardhatUserConfig = {
     tests: "./test",
   },
   solidity: {
-    version: "0.8.19",
+    version: "0.8.21",
     settings: {
       metadata: {
         // Not including the metadata hash
