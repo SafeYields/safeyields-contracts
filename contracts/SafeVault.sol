@@ -11,7 +11,8 @@ import { ISafeVault } from "./interfaces/ISafeVault.sol";
 
 /**
  * @title SafeVault
- * @dev The SafeVault contract represents a secure vault for USDC, represented by the SafeYields Token (SAFE) and built on the ERC4626 standard.
+ * @dev The SafeVault contract represents a secure vault for USDC,
+ * represented by the SafeYields Token (SAFE) and built on the ERC4626 standard.
  * It inherits from Ownable, Pausable, ERC4626, and ERC20 contracts. The vault supports functionality to update buy
  * and sell taxes, as well as pausing and unpausing contract operations.
  */
