@@ -7,5 +7,6 @@ interface ISafeVault {
     event SellTaxUpdated(uint256 newSellTaxBps);
 
     function updateBuyTaxBps(uint256 newBuyTaxBps) external;
+
     function updateSellTaxBps(uint256 newSellTaxBps) external;
 }
