@@ -6,6 +6,7 @@ import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { ERC4626 } from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { ISafeVault } from "./interfaces/ISafeVault.sol";
 
@@ -67,23 +68,33 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
         _unpause();
     }
 
-    /**
-     * @dev See {ERC4626-_deposit}.
-     */
-    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
-        super._deposit(caller, receiver, assets, shares);
+    /** @dev See {IERC4626-deposit}. */
+    function deposit(uint256 assets, address receiver) public override returns (uint256) {
+        uint256 maxAssets = maxDeposit(receiver);
+        if (assets > maxAssets) {
+            revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
+        }
+
+        uint256 assetsAfterTax = assets - ((assets * buyTaxBps) / 10000);
+
+        uint256 shares = previewDeposit(assetsAfterTax);
+        _deposit(_msgSender(), receiver, assets, shares);
+
+        return shares;
     }
 
-    /**
-     * @dev See {ERC4626-_withdraw}.
-     */
-    function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares
-    ) internal override {
-        super._withdraw(caller, receiver, owner, assets, shares);
+    /** @dev See {IERC4626-withdraw}. */
+    function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
+        uint256 maxAssets = maxWithdraw(owner);
+        if (assets > maxAssets) {
+            revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
+        }
+
+        uint256 assetsAfterTax = assets - ((assets * sellTaxBps) / 10000);
+
+        uint256 shares = previewWithdraw(assets);
+        _withdraw(_msgSender(), receiver, owner, assetsAfterTax, shares);
+
+        return shares;
     }
 }
