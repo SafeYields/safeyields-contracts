@@ -65,4 +65,24 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
     function unpause() external onlyOwner {
         _unpause();
     }
+
+    /**
+     * @dev See {ERC4626-_deposit}.
+     */
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
+        super._deposit(caller, receiver, assets, shares);
+    }
+
+    /**
+     * @dev See {ERC4626-_withdraw}.
+     */
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal override {
+        super._withdraw(caller, receiver, owner, assets, shares);
+    }
 }
