@@ -69,7 +69,7 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
     }
 
     /** @dev See {IERC4626-deposit}. */
-    function deposit(uint256 assets, address receiver) public override returns (uint256) {
+    function deposit(uint256 assets, address receiver) public override whenNotPaused returns (uint256) {
         uint256 maxAssets = maxDeposit(receiver);
         if (assets > maxAssets) {
             revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
@@ -83,8 +83,27 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
         return shares;
     }
 
+    /** @dev See {IERC4626-mint}.
+     *
+     * As opposed to {deposit}, minting is allowed even if the vault is in a state where the price of a share is zero.
+     * In this case, the shares will be minted without requiring any assets to be deposited.
+     */
+    function mint(uint256 shares, address receiver) public override whenNotPaused returns (uint256) {
+        uint256 maxShares = maxMint(receiver);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxMint(receiver, shares, maxShares);
+        }
+
+        uint256 assets = previewMint(shares);
+
+        uint256 assetsAfterTax = assets + ((assets * buyTaxBps) / 10000);
+        _deposit(_msgSender(), receiver, assetsAfterTax, shares);
+
+        return assets;
+    }
+
     /** @dev See {IERC4626-withdraw}. */
-    function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
+    function withdraw(uint256 assets, address receiver, address owner) public override whenNotPaused returns (uint256) {
         uint256 maxAssets = maxWithdraw(owner);
         if (assets > maxAssets) {
             revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
@@ -96,5 +115,20 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
         _withdraw(_msgSender(), receiver, owner, assetsAfterTax, shares);
 
         return shares;
+    }
+
+    /** @dev See {IERC4626-redeem}. */
+    function redeem(uint256 shares, address receiver, address owner) public override whenNotPaused returns (uint256) {
+        uint256 maxShares = maxRedeem(owner);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
+        }
+
+        uint256 assets = previewRedeem(shares);
+
+        uint256 assetsAfterTax = assets - ((assets * sellTaxBps) / 10000);
+        _withdraw(_msgSender(), receiver, owner, assetsAfterTax, shares);
+
+        return assets;
     }
 }
