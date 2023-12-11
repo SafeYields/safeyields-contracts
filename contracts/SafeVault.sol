@@ -104,10 +104,10 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
         SafeERC20.safeTransferFrom(IERC20(asset()), _msgSender(), address(this), assets);
 
         // Transfer the management tax
-        IERC20(IERC20(asset())).transfer(managementAddress, managementTax);
+        IERC20(asset()).transfer(managementAddress, managementTax);
 
         // Transfer the AI fund tax
-        IERC20(IERC20(asset())).transfer(aiFundAddress, aiFundTax);
+        IERC20(asset()).transfer(aiFundAddress, aiFundTax);
 
         _mint(receiver, shares);
 
@@ -121,19 +121,19 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
      * As opposed to {deposit}, minting is allowed even if the vault is in a state where the price of a share is zero.
      * In this case, the shares will be minted without requiring any assets to be deposited.
      */
-    function mint(uint256 shares, address receiver) public override whenNotPaused returns (uint256) {
-        uint256 maxShares = maxMint(receiver);
-        if (shares > maxShares) {
-            revert ERC4626ExceededMaxMint(receiver, shares, maxShares);
-        }
+    // function mint(uint256 shares, address receiver) public override whenNotPaused returns (uint256) {
+    //     uint256 maxShares = maxMint(receiver);
+    //     if (shares > maxShares) {
+    //         revert ERC4626ExceededMaxMint(receiver, shares, maxShares);
+    //     }
 
-        uint256 assets = previewMint(shares);
+    //     uint256 assets = previewMint(shares);
 
-        uint256 assetsAfterTax = assets + ((assets * buyTaxBps) / 10000);
-        _deposit(_msgSender(), receiver, assetsAfterTax, shares);
+    //     uint256 assetsAfterTax = assets + ((assets * buyTaxBps) / 10000);
+    //     _deposit(_msgSender(), receiver, assetsAfterTax, shares);
 
-        return assets;
-    }
+    //     return assets;
+    // }
 
     /** @dev See {IERC4626-withdraw}. */
     function withdraw(uint256 assets, address receiver, address owner) public override whenNotPaused returns (uint256) {
@@ -142,26 +142,51 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
             revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
         }
 
-        uint256 assetsAfterTax = assets - ((assets * sellTaxBps) / 10000);
+        // Calculate tax for buying $SAFE
+        uint256 vaultTax = (assets * sellTaxBps) / 10000;
+
+        // Calclulate the management tax
+        uint256 managementTax = (vaultTax * MANAGEMENT_FEE) / 10000;
+
+        // Calculate the AI Fund tax
+        uint256 aiFundTax = (vaultTax * AI_FUND_FEE) / 10000;
+
+        // Calculate assets after tax is deducted
+        uint256 assetsAfterTax = assets - vaultTax;
 
         uint256 shares = previewWithdraw(assets);
-        _withdraw(_msgSender(), receiver, owner, assetsAfterTax, shares);
+
+        if (_msgSender() != owner) {
+            _spendAllowance(owner, _msgSender(), shares);
+        }
+
+        _burn(owner, shares);
+
+        SafeERC20.safeTransfer(IERC20(asset()), receiver, assetsAfterTax);
+
+        // Transfer the management tax
+        IERC20(asset()).transfer(managementAddress, managementTax);
+
+        // Transfer the AI fund tax
+        IERC20(asset()).transfer(aiFundAddress, aiFundTax);
+
+        emit Withdraw(_msgSender(), receiver, owner, assetsAfterTax, shares);
 
         return shares;
     }
 
     /** @dev See {IERC4626-redeem}. */
-    function redeem(uint256 shares, address receiver, address owner) public override whenNotPaused returns (uint256) {
-        uint256 maxShares = maxRedeem(owner);
-        if (shares > maxShares) {
-            revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
-        }
+    // function redeem(uint256 shares, address receiver, address owner) public override whenNotPaused returns (uint256) {
+    //     uint256 maxShares = maxRedeem(owner);
+    //     if (shares > maxShares) {
+    //         revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
+    //     }
 
-        uint256 assets = previewRedeem(shares);
+    //     uint256 assets = previewRedeem(shares);
 
-        uint256 assetsAfterTax = assets - ((assets * sellTaxBps) / 10000);
-        _withdraw(_msgSender(), receiver, owner, assetsAfterTax, shares);
+    //     uint256 assetsAfterTax = assets - ((assets * sellTaxBps) / 10000);
+    //     _withdraw(_msgSender(), receiver, owner, assetsAfterTax, shares);
 
-        return assets;
-    }
+    //     return assets;
+    // }
 }
