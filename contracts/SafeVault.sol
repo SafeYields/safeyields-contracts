@@ -208,17 +208,45 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
     }
 
     /** @dev See {IERC4626-redeem}. */
-    // function redeem(uint256 shares, address receiver, address owner) public override whenNotPaused returns (uint256) {
-    //     uint256 maxShares = maxRedeem(owner);
-    //     if (shares > maxShares) {
-    //         revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
-    //     }
+    function redeem(uint256 shares, address receiver, address owner) public override whenNotPaused returns (uint256) {
+        uint256 maxShares = maxRedeem(owner);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
+        }
 
-    //     uint256 assets = previewRedeem(shares);
+        // Get the fair USDC value for the amount of $SAFE
+        uint256 assets = previewRedeem(shares);
 
-    //     uint256 assetsAfterTax = assets - ((assets * sellTaxBps) / 10000);
-    //     _withdraw(_msgSender(), receiver, owner, assetsAfterTax, shares);
+        // Calculate the total Vault Tax
+        uint256 vaultTax = (assets * sellTaxBps) / 10000;
 
-    //     return assets;
-    // }
+        // Calclulate the management tax
+        uint256 managementTax = (vaultTax * MANAGEMENT_FEE) / 10000;
+
+        // Calculate the AI Fund tax
+        uint256 aiFundTax = (vaultTax * AI_FUND_FEE) / 10000;
+
+        // Calculate the assets to distribute after tax
+        uint256 assetsAfterTax = assets - vaultTax;
+
+        if (_msgSender() != owner) {
+            _spendAllowance(owner, _msgSender(), shares);
+        }
+
+        // Burn $SAFE
+        _burn(owner, shares);
+
+        // Transfer USDC to owner after tax is deducted
+        SafeERC20.safeTransfer(IERC20(asset()), receiver, assetsAfterTax);
+
+        // Transfer the management tax
+        IERC20(asset()).transfer(managementAddress, managementTax);
+
+        // Transfer the AI fund tax
+        IERC20(asset()).transfer(aiFundAddress, aiFundTax);
+
+        emit Withdraw(_msgSender(), receiver, owner, assetsAfterTax, shares);
+
+        return assets;
+    }
 }
