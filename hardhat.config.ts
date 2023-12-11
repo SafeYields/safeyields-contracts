@@ -1,16 +1,21 @@
 import "@nomicfoundation/hardhat-toolbox";
+import { config as dotenvConfig } from "dotenv";
 import "hardhat-deploy";
 import type { HardhatUserConfig } from "hardhat/config";
 import { vars } from "hardhat/config";
 import type { NetworkUserConfig } from "hardhat/types";
+import { resolve } from "path";
 
 import "./tasks/accounts";
 import "./tasks/greet";
 import "./tasks/taskDeploy";
 
-// Run 'npx hardhat vars setup' to see the list of variables that need to be set
+const dotenvConfigPath: string = process.env.DOTENV_CONFIG_PATH || "./.env";
+dotenvConfig({ path: resolve(__dirname, dotenvConfigPath) });
 
-const mnemonic: string = vars.get("MNEMONIC");
+// Ensure that we have all the environment variables we need.
+const mnemonic: string | undefined = process.env.MNEMONIC;
+
 const infuraApiKey: string = vars.get("INFURA_API_KEY");
 
 const chainIds = {
@@ -43,11 +48,7 @@ function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
       jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
   }
   return {
-    accounts: {
-      count: 10,
-      mnemonic,
-      path: "m/44'/60'/0'/0",
-    },
+    accounts: [process.env.WALLET_PK || ""],
     chainId: chainIds[chain],
     url: jsonRpcUrl,
   };
