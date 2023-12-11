@@ -24,6 +24,7 @@ const chainIds = {
   "polygon-mainnet": 137,
   "polygon-mumbai": 80001,
   sepolia: 11155111,
+  "arbitrum-goerli": 421613
 };
 
 function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
@@ -34,6 +35,9 @@ function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
       break;
     case "bsc":
       jsonRpcUrl = "https://bsc-dataseed1.binance.org";
+      break;
+    case "arbitrum-goerli":
+      jsonRpcUrl = "https://goerli-rollup.arbitrum.io/rpc";
       break;
     default:
       jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
@@ -64,6 +68,7 @@ const config: HardhatUserConfig = {
       polygon: vars.get("POLYGONSCAN_API_KEY", ""),
       polygonMumbai: vars.get("POLYGONSCAN_API_KEY", ""),
       sepolia: vars.get("ETHERSCAN_API_KEY", ""),
+      arbitrumGoerli: vars.get("ARBISCAN_API_KEY", ""),
     },
   },
   gasReporter: {
@@ -94,6 +99,7 @@ const config: HardhatUserConfig = {
     "polygon-mainnet": getChainConfig("polygon-mainnet"),
     "polygon-mumbai": getChainConfig("polygon-mumbai"),
     sepolia: getChainConfig("sepolia"),
+    "arbitrum-goerli": getChainConfig("arbitrum-goerli"),
   },
   paths: {
     artifacts: "./artifacts",
