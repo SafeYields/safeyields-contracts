@@ -78,7 +78,10 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
         _unpause();
     }
 
-    /** @dev See {IERC4626-deposit}. */
+    /** @dev See {IERC4626-deposit}.
+     *
+     * This is the equivalent of trading USDC for $SAFE.
+     */
     function deposit(uint256 assets, address receiver) public override whenNotPaused returns (uint256) {
         uint256 maxAssets = maxDeposit(receiver);
         if (assets > maxAssets) {
@@ -109,6 +112,7 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
         // Transfer the AI fund tax
         IERC20(asset()).transfer(aiFundAddress, aiFundTax);
 
+        // Mint $SAFE
         _mint(receiver, shares);
 
         emit Deposit(_msgSender(), receiver, assets, shares);
@@ -118,24 +122,50 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
 
     /** @dev See {IERC4626-mint}.
      *
-     * As opposed to {deposit}, minting is allowed even if the vault is in a state where the price of a share is zero.
-     * In this case, the shares will be minted without requiring any assets to be deposited.
+     * This is the equivalent of buying exact amount of $SAFE
      */
-    // function mint(uint256 shares, address receiver) public override whenNotPaused returns (uint256) {
-    //     uint256 maxShares = maxMint(receiver);
-    //     if (shares > maxShares) {
-    //         revert ERC4626ExceededMaxMint(receiver, shares, maxShares);
-    //     }
+    function mint(uint256 shares, address receiver) public override whenNotPaused returns (uint256) {
+        uint256 maxShares = maxMint(receiver);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxMint(receiver, shares, maxShares);
+        }
 
-    //     uint256 assets = previewMint(shares);
+        // Get the fair USDC value for the amount of $SAFE
+        uint256 assets = previewMint(shares);
 
-    //     uint256 assetsAfterTax = assets + ((assets * buyTaxBps) / 10000);
-    //     _deposit(_msgSender(), receiver, assetsAfterTax, shares);
+        // Calculate the Vault tax
+        uint256 vaultTax = (assets * buyTaxBps) / 10000;
 
-    //     return assets;
-    // }
+        // Calculate the assets with inclusive tax
+        uint256 assetsAfterTax = assets + vaultTax;
 
-    /** @dev See {IERC4626-withdraw}. */
+        // Calclulate the management tax
+        uint256 managementTax = (vaultTax * MANAGEMENT_FEE) / 10000;
+
+        // Calculate the AI Fund tax
+        uint256 aiFundTax = (vaultTax * AI_FUND_FEE) / 10000;
+
+        // Transfer the USDC to the Vault
+        SafeERC20.safeTransferFrom(IERC20(asset()), _msgSender(), address(this), assetsAfterTax);
+
+        // Transfer the management tax
+        IERC20(asset()).transfer(managementAddress, managementTax);
+
+        // Transfer the AI fund tax
+        IERC20(asset()).transfer(aiFundAddress, aiFundTax);
+
+        // Mint $SAFE
+        _mint(receiver, shares);
+
+        emit Deposit(_msgSender(), receiver, assetsAfterTax, shares);
+
+        return assets;
+    }
+
+    /** @dev See {IERC4626-withdraw}.
+     *
+     * This is the equivalent of trading $SAFE for USDC.
+     */
     function withdraw(uint256 assets, address receiver, address owner) public override whenNotPaused returns (uint256) {
         uint256 maxAssets = maxWithdraw(owner);
         if (assets > maxAssets) {
@@ -160,8 +190,10 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
             _spendAllowance(owner, _msgSender(), shares);
         }
 
+        // Burn $SAFE
         _burn(owner, shares);
 
+        // Transfet the assets (USDC) to the owner
         SafeERC20.safeTransfer(IERC20(asset()), receiver, assetsAfterTax);
 
         // Transfer the management tax
