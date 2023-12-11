@@ -21,6 +21,12 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
     uint256 public buyTaxBps;
     uint256 public sellTaxBps;
 
+    address public managementAddress;
+    address public aiFundAddress;
+
+    uint256 public constant MANAGEMENT_FEE = 2500;
+    uint256 public constant AI_FUND_FEE = 2500;
+
     /**
      * @dev Constructor to initialize the SafeVault contract.
      * @param _usdc The ERC20 token representing USDC.
@@ -30,10 +36,14 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
     constructor(
         IERC20 _usdc,
         uint256 _buyTaxBps,
-        uint256 _sellTaxBps
+        uint256 _sellTaxBps,
+        address _managementAddress,
+        address _aiFundAddress
     ) Ownable(msg.sender) ERC4626(_usdc) ERC20("SafeYields Token", "SAFE") {
         buyTaxBps = _buyTaxBps;
         sellTaxBps = _sellTaxBps;
+        managementAddress = _managementAddress;
+        aiFundAddress = _aiFundAddress;
     }
 
     /**
@@ -75,10 +85,33 @@ contract SafeVault is ISafeVault, ERC4626, Ownable, Pausable {
             revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
         }
 
-        uint256 assetsAfterTax = assets - ((assets * buyTaxBps) / 10000);
+        // Calculate tax for buying $SAFE
+        uint256 vaultTax = (assets * buyTaxBps) / 10000;
 
+        // Calclulate the management tax
+        uint256 managementTax = (vaultTax * MANAGEMENT_FEE) / 10000;
+
+        // Calculate the AI Fund tax
+        uint256 aiFundTax = (vaultTax * AI_FUND_FEE) / 10000;
+
+        // Calculate assets after tax is deducted
+        uint256 assetsAfterTax = assets - vaultTax;
+
+        // Calculate shares equivalent to the assets after tax
         uint256 shares = previewDeposit(assetsAfterTax);
-        _deposit(_msgSender(), receiver, assets, shares);
+
+        // Transfer the assets (USDC) to the $SAFE Vault Contract
+        SafeERC20.safeTransferFrom(IERC20(asset()), _msgSender(), address(this), assets);
+
+        // Transfer the management tax
+        IERC20(IERC20(asset())).transfer(managementAddress, managementTax);
+
+        // Transfer the AI fund tax
+        IERC20(IERC20(asset())).transfer(aiFundAddress, aiFundTax);
+
+        _mint(receiver, shares);
+
+        emit Deposit(_msgSender(), receiver, assets, shares);
 
         return shares;
     }
